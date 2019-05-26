@@ -1,0 +1,73 @@
+version: "3.7"
+
+services:
+  elasticsearch:
+    build: ./elastisearch-opendistro-sec
+    image: stanislavprihoda/elastic-opendistro-sec 
+    container_name: elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      # - elasticsearch-vol:/usr/share/elasticsearch/data 
+      - ./elastisearch-opendistro-sec/config.yml:/usr/share/elasticsearch/plugins/opendistro_security/securityconfig/config.yml
+    environment:
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - elastic-network
+    depends_on:
+      - openldap
+  kibana:
+    build: ./kibana-opendistro-sec
+    image: stanislavprihoda/kibana-opendistro-sec
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    volumes:
+      - ./kibana-opendistro-sec/kibana.yml:/usr/share/kibana/config/kibana.yml
+      - ./certificates/:/usr/share/kibana/config/certificates/
+    networks:
+      - elastic-network
+  openldap:
+    image: osixia/openldap
+    container_name: openldap
+    command: --copy-service
+    volumes:
+      - config:/etc/ldap/slapd.d
+      - database:/var/lib/ldap
+    ports:
+      - "389:389"
+      - "636:636"
+      - "8389:389"
+    environment:
+      - "LDAP_TLS=false"
+    networks:
+      - elastic-network
+  phpldapadmin:
+    image: osixia/phpldapadmin
+    container_name: phpldapadmin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: openldap
+    links:
+      - openldap
+    depends_on:
+      - openldap
+    ports:
+      - "6443:443" 
+    networks:
+      - elastic-network
+
+volumes:
+  elasticsearch-vol:
+  config:
+  database:
+
+networks:
+  elastic-network:
+    name: elastic-network
